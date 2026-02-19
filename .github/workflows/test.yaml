@@ -4,20 +4,23 @@ name: Run Tests
 on: [push, pull_request]
 
 jobs:
-  test:
-    # Запуск на последней версии Ubuntu
+  build:
     runs-on: ubuntu-latest
-
     steps:
       # Шаг 1: Получение кода из репозитория
       - uses: actions/checkout@v4
 
-      # Шаг 2: Очистка кэша Maven для предотвращения конфликтов зависимостей
+      # Шаг 2: Установка системных зависимостей
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgbm-dev imagemagick
+
+      # Шаг 3: Очистка кэша Maven для предотвращения конфликтов зависимостей
       - name: Clean Maven cache
         run: mvn dependency:purge-local-repository
 
-      # Шаг 3: Кэширование Maven‑зависимостей для ускорения сборок
-      # Ключ кэша зависит от хэша pom.xml — кэш обновляется при изменении зависимостей
+      # Шаг 4: Кэширование Maven‑зависимостей для ускорения сборок
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
@@ -25,12 +28,6 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-
-      # Шаг 4: Установка системных зависимостей
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgbm-dev
 
       # Шаг 5: Установка Java 17 (Temurin distribution — популярный дистрибутив OpenJDK)
       - name: Set up Java 17
@@ -44,15 +41,13 @@ jobs:
         run: mvn install -DskipTests
 
       # Шаг 7: Кэширование браузеров Playwright для ускорения установки
-      # Ключ зависит от ОС (Ubuntu в данном случае)
       - name: Cache Playwright browsers
-        uses: actions/cache@v4  # Исправлена версия на актуальную (v4 вместо v3)
+        uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}
 
-      # Шаг 8: Установка браузера Chromium для Playwright
-      # Устанавливается только Chromium для экономии времени и места
+      # Шаг 8: Установка браузеров Playwright (Chromium)
       - name: Install Playwright browsers
         run: mvn exec:java -Dexec.mainClass="com.microsoft.playwright.CLI" -Dexec.args="install chromium"
 
@@ -65,8 +60,7 @@ jobs:
         env:
           ALLURE_RESULTS_DIR: target/allure-results
 
-      # Шаг 10: Запуск конкретного тестового класса ExampleTest
-      # (можно объединить с предыдущим шагом, если это избыточно)
+      # Шаг 10: Запуск конкретного тестового класса (опционально)
       - name: Run specific test
         run: mvn test -Dtest=ExampleTest
         env:
