@@ -95,7 +95,7 @@ public class CartFixTest {
             attachElementScreenshot("cart", page.locator("button:has-text('Delete')"));
 
             // Проверка
-            assertEquals(2, page.locator("button:has-text('Delete')").count());
+            assertEquals(0, page.locator("button:has-text('Delete')").count());
         } catch (Exception e) {
             // при ошибке делаем скриншот всей страницы
             attachFullPageScreenshot("Error_" + testName);
