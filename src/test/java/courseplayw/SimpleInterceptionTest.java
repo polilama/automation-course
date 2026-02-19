@@ -11,7 +11,7 @@ import java.util.Map;
 public class SimpleInterceptionTest {
 
     static Playwright playwright;
-    static Browser browser;
+    public static Browser browser;
     BrowserContext context;
     Page page;
 
