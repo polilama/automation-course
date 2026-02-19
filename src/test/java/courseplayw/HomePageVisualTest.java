@@ -10,7 +10,6 @@ import io.qameta.allure.Allure;
 import org.junit.jupiter.api.*;
 
 public class HomePageVisualTest {
-    // Пути к файлам
     private final Path expectedPath = Paths.get("expected.png");
     private final Path actualPath = Paths.get("actual.png");
     private final Path diffPath = Paths.get("diff.png");
