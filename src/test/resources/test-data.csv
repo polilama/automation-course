@@ -1,0 +1,3 @@
+browserType,path,expectedTitle
+chromium,/,The Internet
+firefox,/dropdown,Dropdown List
