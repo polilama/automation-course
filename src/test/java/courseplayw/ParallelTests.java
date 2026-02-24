@@ -17,6 +17,9 @@ public class ParallelTests {
                 Page page = context.newPage();
                 page.navigate("https://the-internet.herokuapp.com/login");
                 assertEquals("The Internet", page.title());
+               // assertTrue(page.isVisible("input#username"));
+               // assertTrue(page.isVisible("input#password"));
+               // assertTrue(page.isVisible("button:has-text('Login')"));
             }
             browser.close();
         }
