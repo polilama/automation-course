@@ -1,26 +1,30 @@
 name: Run Tests
 
-# Триггеры: запуск при push и pull request для непрерывной интеграции
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
-    steps:
-      # Шаг 1: Получение кода из репозитория
-      - uses: actions/checkout@v4
+    strategy:
+      matrix:
+        env: [dev, prod]
 
-      # Шаг 2: Установка системных зависимостей
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb libgbm-dev imagemagick
 
-      # Шаг 3: Очистка кэша Maven для предотвращения конфликтов зависимостей
       - name: Clean Maven cache
         run: mvn dependency:purge-local-repository
 
-      # Шаг 4: Кэширование Maven‑зависимостей для ускорения сборок
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
@@ -29,53 +33,75 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      # Шаг 5: Установка Java 17 (Temurin distribution — популярный дистрибутив OpenJDK)
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # Шаг 6: Разрешение зависимостей Maven без запуска тестов
       - name: Resolve dependencies
         run: mvn install -DskipTests
 
-      # Шаг 7: Кэширование браузеров Playwright для ускорения установки
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}
 
-      # Шаг 8: Установка браузеров Playwright (Chromium)
       - name: Install Playwright browsers
-        run: mvn exec:java -Dexec.mainClass="com.microsoft.playwright.CLI" -Dexec.args="install chromium"
+        run: npx playwright install chromium
 
-      # Шаг 9: Запуск тестов с Xvfb (виртуальный фреймбуфер для GUI‑тестов)
-      - name: Run tests with Xvfb
+      # Проверка конфигурационных файлов
+      - name: Verify and debug config files for ${{ matrix.env }}
+        run: |
+          echo "=== DEBUG: Environment variables ==="
+          echo "Current env: ${{ matrix.env }}"
+          echo "ALLURE_RESULTS_DIR: $ALLURE_RESULTS_DIR"
+
+          echo "=== DEBUG: File system ==="
+          ls -la src/test/resources/ || echo "src/test/resources/ not found"
+
+          CONFIG_FILE="src/test/resources/config-${{ matrix.env }}.properties"
+          if [ -f "$CONFIG_FILE" ]; then
+            echo "✅ Config file found: $CONFIG_FILE"
+            echo "=== Config file content ==="
+            cat "$CONFIG_FILE"
+
+            # Проверка наличия baseUrl и его значения
+            if grep -q "^baseUrl=" "$CONFIG_FILE"; then
+              BASE_URL=$(grep "^baseUrl=" "$CONFIG_FILE" | cut -d'=' -f2-)
+              echo "baseUrl: '$BASE_URL'"
+              if [ -z "$BASE_URL" ]; then
+                echo "❌ ERROR: baseUrl is empty in config!"
+                exit 1
+              fi
+            else
+              echo "❌ ERROR: baseUrl parameter not found!"
+              exit 1
+            fi
+          else
+            echo "❌ ERROR: Config file not found!"
+            exit 1
+          fi
+
+      # Запуск тестов с Xvfb
+      - name: Run all tests with Xvfb for ${{ matrix.env }} environment
         run: |
           export DISPLAY=:0
           Xvfb :0 -screen 0 1280x720x24 >/dev/null 2>&1 &
-          mvn clean test -B
+          echo "Running tests with env=${{ matrix.env }}"
+          mvn test -B -Denv=${{ matrix.env }}
         env:
           ALLURE_RESULTS_DIR: target/allure-results
 
-      # Шаг 10: Запуск конкретного тестового класса (опционально)
-      - name: Run specific test
-        run: mvn test -Dtest=ExampleTest
-        env:
-          ALLURE_RESULTS_DIR: target/allure-results
-
-      # Шаг 11: Генерация отчёта Allure
       - name: Generate Allure Report
         if: always()
         run: mvn allure:report -B
 
-      # Шаг 12: Загрузка отчёта Allure как артефакта
       - name: Upload Allure Report as artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: allure-report
+          name: allure-report-${{ matrix.env }}
           path: target/site/allure-maven-plugin
           retention-days: 30
